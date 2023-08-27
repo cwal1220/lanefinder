@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
-from edgetpu.basic.basic_engine import BasicEngine
+# from edgetpu.basic.basic_engine import BasicEngine
+import pycoral.utils.edgetpu as etpu
+from pycoral.adapters import common
 from image.processing import preprocessing, postprocessing
 
 
@@ -8,12 +10,20 @@ class Lanefinder:
 
     def __init__(self, model, input_shape, output_shape, quant, dequant):
         self._window = None
-        self._engine = self._get_tpu_engine(model)
-        self._cap = cv2.VideoCapture(0)
+        self.interpreter = self._get_tpu_engine(model)
+        self.interpreter.allocate_tensors()
+        self._cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
         self._size = input_shape
         self._output_shape = output_shape
         self._quant = quant
         self._dequant = dequant
+
+        self.input_details = self.interpreter.get_input_details()
+        self.output_details = self.interpreter.get_output_details()
+        self.input_zero = self.input_details[0]['quantization'][1]
+        self.input_scale = self.input_details[0]['quantization'][0]
+        self.output_zero = self.output_details[0]['quantization'][1]
+        self.output_scale = self.output_details[0]['quantization'][0]
 
     @property
     def window(self):
@@ -27,7 +37,9 @@ class Lanefinder:
     def _get_tpu_engine(model):
         try:
             # get runtime for TPU
-            model = BasicEngine(model)
+            # model = BasicEngine(model)
+            # Chan
+            model = etpu.make_interpreter(model)
 
         except RuntimeError:
             # TPU has not been detected
@@ -77,11 +89,16 @@ class Lanefinder:
             frame = cv2.resize(frame, tuple(self._size))
             frame = frame.astype(np.float32)
 
-            if self._engine is not None:
+            if self.interpreter is not None:
                 # TPU engine has been initiated
                 # so run inference steps
                 frame = self._preprocess(frame)
-                pred_obj = self._engine.run_inference(frame.flatten())
+                # Chan
+                # pred_obj = self._engine.run_inference(frame.flatten())
+                self.input_details = self.interpreter.get_input_details()
+                self.interpreter.set_tensor(self.input_details[0]['index'], frame)
+                self.interpreter.invoke()
+                pred_obj = (common.output_tensor(self.interpreter, 0) - self.output_zero) * self.output_scale
                 pred = self._postprocess(pred_obj, frmcpy)
 
             else:

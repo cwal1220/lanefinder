@@ -9,7 +9,7 @@ def read_config():
         raise FileNotFoundError('Could not find config file')
 
     with open('config.yaml', 'r') as file:
-        config = yaml.load(file)
+        config = yaml.full_load(file)
 
     return config
 

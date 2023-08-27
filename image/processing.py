@@ -16,7 +16,7 @@ def preprocessing(frame, mean, std):
 def postprocessing(pred_obj, frame, mean, std, in_shape, out_shape):
     # get predicted mask in shape (n_rows*n_cols, )
     # and reshape back to (n_rows, n_cols)
-    pred = pred_obj[1].reshape(in_shape)
+    pred = pred_obj.reshape(in_shape)
 
     # dequantize and cast back to float
     dequantized = (std * (pred - mean))
